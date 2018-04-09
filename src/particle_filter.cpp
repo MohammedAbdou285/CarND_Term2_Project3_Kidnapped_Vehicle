@@ -20,7 +20,7 @@
 using namespace std;
 
 // use the default random engine generator as it will be used many times
-default_random_engine gen;
+static default_random_engine gen;
 
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
@@ -78,7 +78,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	normal_distribution<double> dist_y  (0.0, std_dev_y);
 	normal_distribution<double> dist_th (0.0, std_dev_th);
 	
-	for (unsigned i = 0; i < num_particles; i++)
+	for (unsigned i = 0; i < particles.size(); i++)
 	{
 		// Special Case
 		if (fabs(yaw_rate) <= 0.0001)
@@ -97,7 +97,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 
 			particles[i].x 		+= (velocity / yaw_rate) * ( sin(theta) - sin(particles[i].theta)) + dist_x(gen);
 			particles[i].y 		+= (velocity / yaw_rate) * (-cos(theta) + cos(particles[i].theta)) + dist_y(gen);
-			particles[i].theta 	+= theta + dist_th(gen);
+			particles[i].theta 	 = theta + dist_th(gen);
 		}
 	}
 
@@ -145,7 +145,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
 
-	for (unsigned i = 0; i < num_particles; i++)
+	for (unsigned i = 0; i < particles.size(); i++)
 	{
 		// Define the predictions to filter map landmarks within the sensor range (ROI)
 		vector<LandmarkObs> predictions;
@@ -154,7 +154,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		{
 			double curr_dist = dist(particles[i].x, particles[i].y, map_landmarks.landmark_list[j].x_f, map_landmarks.landmark_list[j].y_f);
 
-			if (curr_dist < sensor_range)
+			if (curr_dist <= sensor_range)
 			{
 				predictions.push_back(LandmarkObs{	map_landmarks.landmark_list[j].id_i,
 													map_landmarks.landmark_list[j].x_f,
@@ -167,8 +167,8 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 		for (unsigned j = 0; j < observations.size(); j++)
 		{
-			double trans_x = particles[j].x + cos(particles[i].theta) * observations[j].x - sin(particles[i].theta) * observations[j].y;
-			double trans_y = particles[j].y + sin(particles[i].theta) * observations[j].x + cos(particles[i].theta) * observations[j].y;
+			double trans_x = particles[i].x + cos(particles[i].theta) * observations[j].x - sin(particles[i].theta) * observations[j].y;
+			double trans_y = particles[i].y + sin(particles[i].theta) * observations[j].x + cos(particles[i].theta) * observations[j].y;
 			t_observations.push_back(LandmarkObs{ observations[j].id, trans_x, trans_y });
 		}
 
@@ -198,7 +198,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 			double x_component = -pow(trans_obs.x - pred.x, 2) / (2 * std_x * std_x);
 			double y_component = -pow(trans_obs.y - pred.y, 2) / (2 * std_y * std_y); 
-			particles[i].weight *= (1/(2*M_PI * std_x * std_y)) * exp(x_component + y_component); 
+			particles[i].weight = (1/(2*M_PI * std_x * std_y)) * exp(x_component + y_component); 
 		}
 	}
 
@@ -223,7 +223,7 @@ void ParticleFilter::resample() {
 	}
 
 	uniform_real_distribution<double> unirealdist(0.0, 2.0 * max_weight);
-	uniform_int_distribution<int> uniintdist(0, num_particles-1);
+	uniform_int_distribution<int> uniintdist(0, num_particles - 1);
 	auto index = uniintdist(gen);
 
 
